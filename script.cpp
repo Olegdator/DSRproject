@@ -1,35 +1,45 @@
-#include <cstdlib>
-#include <cstdio>
-#include <cstring>
+#include <cstdlib> 
+#include <cstdio> 
+#include <cstring> 
+#include <vector>
+ 
+void extract_firmware(const char* pcap_file, const char* firmware_file) { 
+    char cmd[1024]; 
 
-void extract_firmware(const char* pcap_file, const char* firmware_file) 
-{
-    // request for tshark
-    char cmd[1024];
-    snprintf(cmd, sizeof(cmd), "tshark -r %s -T fields -e data", pcap_file);
-
-    // save result in buffer
-    FILE* pipe = popen(cmd, "r");
-    char buffer[1024];
-    size_t n = fread(buffer, 1, sizeof(buffer), pipe);
-    pclose(pipe);
-
-    // removing \n from buffer
-    for (size_t i = 0; i < n; i++) 
-    {
-        if (buffer[i] == '\n') 
-        {
-            buffer[i] = '\0';
-            break;
-        }
+    int n = snprintf(cmd, sizeof(cmd), "tshark -r \"%s\" -T fields -e data", pcap_file);
+    
+    if (n <= 0 || n >= sizeof(cmd)) {
+        printf("Formating error!\n");
+        return;
     }
 
-    // writing uploads to file
+    FILE* pipe = popen(cmd, "r"); 
     FILE* out = fopen(firmware_file, "wb");
-    if (out) 
-    {
-        fwrite(buffer, 1, n, out);
+
+    if (pipe && out) { 
+        std::vector<char> buffer(1024);
+        size_t n; 
+
+        while ((n = fread(buffer.data(), 1, buffer.size(), pipe)) > 0) {
+            fwrite(buffer.data(), 1, n, out); 
+
+            if (n == buffer.size()) {
+                buffer.resize(buffer.size() * 2);
+            }
+        }
+
         fclose(out);
+        pclose(pipe); 
+    } else {
+        printf("Error of opening!\n");
+
+        if (pipe) {
+            pclose(pipe);
+        }
+
+        if (out) {
+            fclose(out);
+        }
     }
 }
 
