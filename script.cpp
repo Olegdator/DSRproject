@@ -2,8 +2,9 @@
 #include <cstdio> 
 #include <cstring> 
 #include <vector>
- 
-void extract_firmware(const char* pcap_file, const char* firmware_file) { 
+#include <sstream>
+
+void extract_firmware(const char* pcap_file, const char* firmware_dir) { 
     char cmd[1024]; 
 
     int n = snprintf(cmd, sizeof(cmd), "tshark -r \"%s\" -T fields -e data", pcap_file);
@@ -14,39 +15,42 @@ void extract_firmware(const char* pcap_file, const char* firmware_file) {
     }
 
     FILE* pipe = popen(cmd, "r"); 
-    FILE* out = fopen(firmware_file, "wb");
-
-    if (pipe && out) { 
+    if (pipe) { 
         std::vector<char> buffer(1024);
-        size_t n; 
+        size_t n;
+        size_t firmware_count = 0;
 
         while ((n = fread(buffer.data(), 1, buffer.size(), pipe)) > 0) {
-            fwrite(buffer.data(), 1, n, out); 
+
+            std::ostringstream filename;
+            filename << firmware_dir << "/firmware" << firmware_count << ".bin";
+
+            FILE* out = fopen(filename.str().c_str(), "wb");
+
+            if (out) {
+                fwrite(buffer.data(), 1, n, out);
+                fclose(out);
+            } else {
+                printf("Ошибка открытия файла %s!\n", filename.str().c_str());
+            }
+
+            firmware_count++;
 
             if (n == buffer.size()) {
                 buffer.resize(buffer.size() * 2);
             }
         }
 
-        fclose(out);
         pclose(pipe); 
     } else {
-        printf("Error of opening!\n");
-
-        if (pipe) {
-            pclose(pipe);
-        }
-
-        if (out) {
-            fclose(out);
-        }
+        printf("Ошибка открытия файла %s!\n", pcap_file);
     }
 }
 
 int main()
 {
   const char* pcap_file = "traffic.pcap";
-  const char* firmware_file = "firmware.bin";
-  extract_firmware(pcap_file, firmware_file);
+  const char* firmware_dir = "D:\\vsstudio\\DSR";
+  extract_firmware(pcap_file, firmware_dir);
   return 0;
 }
